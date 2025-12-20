@@ -1,6 +1,8 @@
-package api
+// Package anthropic provides the HTTP client for the Anthropic OAuth API.
+package anthropic
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,7 +36,10 @@ func NewClient(accessToken string) *Client {
 
 // GetUsage fetches the current usage from the OAuth usage endpoint
 func (c *Client) GetUsage() (*UsageResponse, error) {
-	req, err := http.NewRequest(http.MethodGet, baseURL+usageEndpoint, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+usageEndpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -49,7 +54,7 @@ func (c *Client) GetUsage() (*UsageResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

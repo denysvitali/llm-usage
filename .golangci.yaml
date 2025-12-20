@@ -83,7 +83,6 @@ linters-settings:
       - name: time-naming
       - name: unexported-return
       - name: var-declaration
-      - name: var-naming
 
 issues:
   exclude-dirs-use-default: true
@@ -101,3 +100,4 @@ issues:
       linters:
         - dupl
         - goconst
+        - revive

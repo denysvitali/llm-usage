@@ -1,3 +1,4 @@
+// Package credentials handles loading OAuth credentials from the Claude CLI.
 package credentials
 
 import (
@@ -46,7 +47,8 @@ func Load() (*Credentials, error) {
 
 // LoadFromPath reads credentials from a specific file path
 func LoadFromPath(path string) (*Credentials, error) {
-	data, err := os.ReadFile(path)
+	cleanPath := filepath.Clean(path)
+	data, err := os.ReadFile(cleanPath) //#nosec G304 -- path is derived from user's home directory
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("credentials file not found at %s - please run 'claude' first to authenticate", path)

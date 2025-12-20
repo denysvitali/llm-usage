@@ -1,3 +1,5 @@
+// Package main provides the claude-usage CLI tool for displaying
+// Claude AI API usage statistics.
 package main
 
 import (
@@ -11,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/denysvitali/claude-code-usage/internal/api"
+	"github.com/denysvitali/claude-code-usage/internal/anthropic"
 	"github.com/denysvitali/claude-code-usage/internal/credentials"
 	"github.com/denysvitali/claude-code-usage/internal/version"
 )
@@ -33,9 +35,6 @@ var (
 
 	valueStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("255"))
-
-	percentStyle = lipgloss.NewStyle().
-			Bold(true)
 
 	normalStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("42"))
@@ -79,7 +78,7 @@ func main() {
 	}
 }
 
-func runUsage(cmd *cobra.Command, args []string) error {
+func runUsage(_ *cobra.Command, _ []string) error {
 	jsonOutput := viper.GetBool("json")
 	waybarOutput := viper.GetBool("waybar")
 
@@ -101,7 +100,7 @@ func runUsage(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s", msg)
 	}
 
-	client := api.NewClient(creds.ClaudeAiOauth.AccessToken)
+	client := anthropic.NewClient(creds.ClaudeAiOauth.AccessToken)
 	usage, err := client.GetUsage()
 	if err != nil {
 		if waybarOutput {
@@ -123,7 +122,7 @@ func runUsage(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func outputJSON(usage *api.UsageResponse) error {
+func outputJSON(usage *anthropic.UsageResponse) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(usage); err != nil {
@@ -140,7 +139,7 @@ type WaybarOutput struct {
 	Percentage int    `json:"percentage"`
 }
 
-func outputWaybar(usage *api.UsageResponse) {
+func outputWaybar(usage *anthropic.UsageResponse) {
 	var maxUtil float64
 	if usage.FiveHour != nil && usage.FiveHour.Utilization > maxUtil {
 		maxUtil = usage.FiveHour.Utilization
@@ -228,7 +227,7 @@ func outputWaybarError(msg string) {
 	}
 }
 
-func outputPretty(usage *api.UsageResponse, tokenExpiresIn time.Duration) {
+func outputPretty(usage *anthropic.UsageResponse, tokenExpiresIn time.Duration) {
 	// Title
 	fmt.Println(titleStyle.Render("Claude Usage (Pro/Max Subscription)"))
 	fmt.Println(titleStyle.Render(strings.Repeat("─", 36)))
@@ -267,7 +266,7 @@ func outputPretty(usage *api.UsageResponse, tokenExpiresIn time.Duration) {
 	fmt.Println(tokenStyle.Render(fmt.Sprintf("Token expires: %s", formatDuration(tokenExpiresIn))))
 }
 
-func printExtraUsage(extra *api.ExtraUsage) {
+func printExtraUsage(extra *anthropic.ExtraUsage) {
 	fmt.Println(headerStyle.Render("Extra Usage Credits:"))
 	if extra.Utilization != nil {
 		bar := renderProgressBar(*extra.Utilization)
@@ -280,7 +279,7 @@ func printExtraUsage(extra *api.ExtraUsage) {
 	}
 }
 
-func printUsageWindow(name string, window *api.UsageWindow) {
+func printUsageWindow(name string, window *anthropic.UsageWindow) {
 	fmt.Println(headerStyle.Render(name + ":"))
 
 	if window == nil {
