@@ -24,11 +24,20 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        id: git-cliff
+        with:
+          config: cliff.toml
+          args: --current --strip header
+        env:
+          OUTPUT: CHANGELOG.md
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
-          args: release --clean
+          version: "~> v2"
+          args: release --clean --release-notes CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
