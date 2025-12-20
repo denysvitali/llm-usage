@@ -2,82 +2,134 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/denysvitali/claude-code-usage/internal/api"
 	"github.com/denysvitali/claude-code-usage/internal/credentials"
 	"github.com/denysvitali/claude-code-usage/internal/version"
 )
 
-const (
-	barWidth = 20
-	barFull  = "█"
-	barEmpty = "░"
+const barWidth = 20
+
+// Lipgloss styles
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("212"))
+
+	headerStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("99"))
+
+	labelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241"))
+
+	valueStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("255"))
+
+	percentStyle = lipgloss.NewStyle().
+			Bold(true)
+
+	normalStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42"))
+
+	warningStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214"))
+
+	criticalStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196"))
+
+	barFullStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42"))
+
+	barEmptyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240"))
+
+	tokenStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Italic(true)
 )
 
-func main() {
-	jsonOutput := flag.Bool("json", false, "Output in JSON format")
-	waybarOutput := flag.Bool("waybar", false, "Output in waybar JSON format")
-	showVersion := flag.Bool("version", false, "Show version and exit")
-	flag.Parse()
+var rootCmd = &cobra.Command{
+	Use:     "claude-usage",
+	Short:   "Display Claude AI API usage statistics",
+	Long:    `A CLI tool to display your Claude AI API usage statistics for Pro and Max subscriptions.`,
+	Version: version.Version,
+	RunE:    runUsage,
+}
 
-	if *showVersion {
-		fmt.Printf("claude-usage %s\n", version.Version)
-		return
+func init() {
+	rootCmd.Flags().Bool("json", false, "Output in JSON format")
+	rootCmd.Flags().Bool("waybar", false, "Output in Waybar JSON format")
+
+	_ = viper.BindPFlag("json", rootCmd.Flags().Lookup("json"))
+	_ = viper.BindPFlag("waybar", rootCmd.Flags().Lookup("waybar"))
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
 	}
+}
+
+func runUsage(cmd *cobra.Command, args []string) error {
+	jsonOutput := viper.GetBool("json")
+	waybarOutput := viper.GetBool("waybar")
 
 	creds, err := credentials.Load()
 	if err != nil {
-		if *waybarOutput {
+		if waybarOutput {
 			outputWaybarError(err.Error())
-			return
+			return nil
 		}
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load credentials: %w", err)
 	}
 
 	if creds.ClaudeAiOauth.IsExpired() {
 		msg := "Token expired - run 'claude' to refresh"
-		if *waybarOutput {
+		if waybarOutput {
 			outputWaybarError(msg)
-			return
+			return nil
 		}
-		fmt.Fprintf(os.Stderr, "Warning: %s\n", msg)
-		os.Exit(1)
+		return fmt.Errorf("%s", msg)
 	}
 
 	client := api.NewClient(creds.ClaudeAiOauth.AccessToken)
 	usage, err := client.GetUsage()
 	if err != nil {
-		if *waybarOutput {
+		if waybarOutput {
 			outputWaybarError(err.Error())
-			return
+			return nil
 		}
-		fmt.Fprintf(os.Stderr, "Error fetching usage: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to fetch usage: %w", err)
 	}
 
 	switch {
-	case *waybarOutput:
+	case waybarOutput:
 		outputWaybar(usage)
-	case *jsonOutput:
-		outputJSON(usage)
+	case jsonOutput:
+		return outputJSON(usage)
 	default:
 		outputPretty(usage, creds.ClaudeAiOauth.ExpiresIn())
 	}
+
+	return nil
 }
 
-func outputJSON(usage *api.UsageResponse) {
+func outputJSON(usage *api.UsageResponse) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(usage); err != nil {
-		fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to encode JSON: %w", err)
 	}
+	return nil
 }
 
 // WaybarOutput represents the JSON format expected by waybar custom modules
@@ -89,7 +141,6 @@ type WaybarOutput struct {
 }
 
 func outputWaybar(usage *api.UsageResponse) {
-	// Use the highest utilization for the percentage and class
 	var maxUtil float64
 	if usage.FiveHour != nil && usage.FiveHour.Utilization > maxUtil {
 		maxUtil = usage.FiveHour.Utilization
@@ -98,7 +149,6 @@ func outputWaybar(usage *api.UsageResponse) {
 		maxUtil = usage.SevenDay.Utilization
 	}
 
-	// Determine class based on utilization
 	class := "normal"
 	if maxUtil >= 90 {
 		class = "critical"
@@ -106,7 +156,6 @@ func outputWaybar(usage *api.UsageResponse) {
 		class = "warning"
 	}
 
-	// Build compact text for the bar
 	var textParts []string
 	if usage.FiveHour != nil {
 		textParts = append(textParts, fmt.Sprintf("5h:%.0f%%", usage.FiveHour.Utilization))
@@ -116,10 +165,8 @@ func outputWaybar(usage *api.UsageResponse) {
 	}
 	text := strings.Join(textParts, " ")
 
-	// Build detailed tooltip
 	var tooltipLines []string
-	tooltipLines = append(tooltipLines, "Claude Usage")
-	tooltipLines = append(tooltipLines, "")
+	tooltipLines = append(tooltipLines, "Claude Usage", "")
 
 	if usage.FiveHour != nil {
 		line := fmt.Sprintf("5-Hour: %.1f%%", usage.FiveHour.Utilization)
@@ -182,8 +229,9 @@ func outputWaybarError(msg string) {
 }
 
 func outputPretty(usage *api.UsageResponse, tokenExpiresIn time.Duration) {
-	fmt.Println("Claude Usage (Pro/Max Subscription)")
-	fmt.Println("====================================")
+	// Title
+	fmt.Println(titleStyle.Render("Claude Usage (Pro/Max Subscription)"))
+	fmt.Println(titleStyle.Render(strings.Repeat("─", 36)))
 	fmt.Println()
 
 	printUsageWindow("5-Hour Window", usage.FiveHour)
@@ -216,36 +264,53 @@ func outputPretty(usage *api.UsageResponse, tokenExpiresIn time.Duration) {
 	}
 
 	fmt.Println()
-	fmt.Printf("Token expires: %s\n", formatDuration(tokenExpiresIn))
+	fmt.Println(tokenStyle.Render(fmt.Sprintf("Token expires: %s", formatDuration(tokenExpiresIn))))
 }
 
 func printExtraUsage(extra *api.ExtraUsage) {
-	fmt.Println("Extra Usage Credits:")
+	fmt.Println(headerStyle.Render("Extra Usage Credits:"))
 	if extra.Utilization != nil {
 		bar := renderProgressBar(*extra.Utilization)
-		fmt.Printf("  Usage:    %s  %.1f%%\n", bar, *extra.Utilization)
+		pct := formatPercentage(*extra.Utilization)
+		fmt.Printf("  %s %s  %s\n", labelStyle.Render("Usage:"), bar, pct)
 	}
 	if extra.UsedCredits != nil && extra.MonthlyLimit != nil {
-		fmt.Printf("  Credits:  $%.2f / $%.2f\n", *extra.UsedCredits, *extra.MonthlyLimit)
+		credits := fmt.Sprintf("$%.2f / $%.2f", *extra.UsedCredits, *extra.MonthlyLimit)
+		fmt.Printf("  %s %s\n", labelStyle.Render("Credits:"), valueStyle.Render(credits))
 	}
 }
 
 func printUsageWindow(name string, window *api.UsageWindow) {
-	fmt.Printf("%s:\n", name)
+	fmt.Println(headerStyle.Render(name + ":"))
 
 	if window == nil {
-		fmt.Printf("  Usage:    %s  N/A\n", strings.Repeat(barEmpty, barWidth))
-		fmt.Printf("  Resets:   N/A\n")
+		bar := barEmptyStyle.Render(strings.Repeat("░", barWidth))
+		fmt.Printf("  %s %s  %s\n", labelStyle.Render("Usage:"), bar, labelStyle.Render("N/A"))
+		fmt.Printf("  %s %s\n", labelStyle.Render("Resets:"), labelStyle.Render("N/A"))
 		return
 	}
 
 	bar := renderProgressBar(window.Utilization)
-	fmt.Printf("  Usage:    %s  %.1f%%\n", bar, window.Utilization)
+	pct := formatPercentage(window.Utilization)
+	fmt.Printf("  %s %s  %s\n", labelStyle.Render("Usage:"), bar, pct)
 
 	if resetDur := window.TimeUntilReset(); resetDur != nil {
-		fmt.Printf("  Resets:   in %s\n", formatDuration(*resetDur))
+		resetText := fmt.Sprintf("in %s", formatDuration(*resetDur))
+		fmt.Printf("  %s %s\n", labelStyle.Render("Resets:"), valueStyle.Render(resetText))
 	} else {
-		fmt.Printf("  Resets:   N/A\n")
+		fmt.Printf("  %s %s\n", labelStyle.Render("Resets:"), labelStyle.Render("N/A"))
+	}
+}
+
+func formatPercentage(percentage float64) string {
+	text := fmt.Sprintf("%.1f%%", percentage)
+	switch {
+	case percentage >= 90:
+		return criticalStyle.Render(text)
+	case percentage >= 75:
+		return warningStyle.Render(text)
+	default:
+		return normalStyle.Render(text)
 	}
 }
 
@@ -258,7 +323,20 @@ func renderProgressBar(percentage float64) string {
 		filled = 0
 	}
 
-	return strings.Repeat(barFull, filled) + strings.Repeat(barEmpty, barWidth-filled)
+	var barStyle lipgloss.Style
+	switch {
+	case percentage >= 90:
+		barStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	case percentage >= 75:
+		barStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	default:
+		barStyle = barFullStyle
+	}
+
+	filledBar := barStyle.Render(strings.Repeat("█", filled))
+	emptyBar := barEmptyStyle.Render(strings.Repeat("░", barWidth-filled))
+
+	return filledBar + emptyBar
 }
 
 func formatDuration(d time.Duration) string {
@@ -270,7 +348,7 @@ func formatDuration(d time.Duration) string {
 	hours := int(d.Hours()) % 24
 	minutes := int(d.Minutes()) % 60
 
-	parts := []string{}
+	var parts []string
 	if days > 0 {
 		parts = append(parts, fmt.Sprintf("%dd", days))
 	}
