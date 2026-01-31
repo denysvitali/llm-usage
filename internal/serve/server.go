@@ -139,11 +139,8 @@ func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 	providerFilter := r.URL.Query().Get("provider")
 	accountFilter := r.URL.Query().Get("account")
 
-	// Re-fetch providers on each request to get fresh data
-	providers := s.providers
-	if providerFilter != "" || accountFilter != "" {
-		providers = usage.GetProviders(providerFilter, accountFilter, accountFilter == "", s.credsMgr)
-	}
+	// Always fetch fresh providers on each request
+	providers := usage.GetProviders(providerFilter, accountFilter, accountFilter == "", s.credsMgr)
 
 	stats := usage.FetchAllUsage(providers)
 
