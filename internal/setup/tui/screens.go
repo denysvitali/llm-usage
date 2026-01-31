@@ -183,7 +183,7 @@ func (m Model) saveAccount() (tea.Model, tea.Cmd) {
 	case "kimi":
 		var creds credentials.KimiCredentials
 		if m.credsMgr.ProviderExists("kimi") {
-			m.credsMgr.LoadProvider("kimi", &creds)
+			_ = m.credsMgr.LoadProvider("kimi", &creds)
 		}
 		if creds.Accounts == nil {
 			creds.Accounts = make(map[string]*credentials.KimiAccount)
@@ -193,7 +193,7 @@ func (m Model) saveAccount() (tea.Model, tea.Cmd) {
 	case "zai":
 		var creds credentials.ZAiCredentials
 		if m.credsMgr.ProviderExists("zai") {
-			m.credsMgr.LoadProvider("zai", &creds)
+			_ = m.credsMgr.LoadProvider("zai", &creds)
 		}
 		if creds.Accounts == nil {
 			creds.Accounts = make(map[string]*credentials.ZAiAccount)

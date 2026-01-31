@@ -30,4 +30,3 @@ type WindowDetail struct {
 	Duration int    `json:"duration"`
 	TimeUnit string `json:"timeUnit"`
 }
-

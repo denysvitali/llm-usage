@@ -58,10 +58,10 @@ type Model struct {
 // NewModel creates a new TUI model with the given credentials manager
 func NewModel(mgr *credentials.Manager) Model {
 	return Model{
-		screen:       screenMainMenu,
-		credsMgr:     mgr,
-		selectedIdx:  0,
-		keys:         DefaultKeyMap(),
+		screen:        screenMainMenu,
+		credsMgr:      mgr,
+		selectedIdx:   0,
+		keys:          DefaultKeyMap(),
 		screenHistory: []screen{},
 	}
 }

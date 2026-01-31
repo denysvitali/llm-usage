@@ -5,15 +5,15 @@ import "github.com/charmbracelet/lipgloss"
 
 // KeyMap defines key bindings for the TUI
 type KeyMap struct {
-	Up       keyBinding
-	Down     keyBinding
-	Enter    keyBinding
-	Escape   keyBinding
-	Quit     keyBinding
-	Back     keyBinding
-	Confirm  keyBinding
-	Cancel   keyBinding
-	Help     keyBinding
+	Up      keyBinding
+	Down    keyBinding
+	Enter   keyBinding
+	Escape  keyBinding
+	Quit    keyBinding
+	Back    keyBinding
+	Confirm keyBinding
+	Cancel  keyBinding
+	Help    keyBinding
 }
 
 // keyBinding represents a single key binding

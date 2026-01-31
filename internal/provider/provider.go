@@ -21,28 +21,28 @@ type Provider interface {
 // Usage represents generic usage statistics from a provider
 type Usage struct {
 	// Provider name
-	Provider string
+	Provider string `json:"provider"`
 
 	// Usage windows (provider-specific, can be nil)
-	Windows []UsageWindow
+	Windows []UsageWindow `json:"windows"`
 
 	// Extra usage information (optional, provider-specific)
-	Extra map[string]any
+	Extra map[string]any `json:"extra"`
 
 	// Error if fetching failed (allows partial results)
-	Error error
+	Error error `json:"error"`
 }
 
 // UsageWindow represents a usage time window
 type UsageWindow struct {
-	Label       string     // e.g., "5-Hour", "7-Day", "Daily"
-	Utilization float64    // 0-100 percentage
-	ResetsAt    *time.Time // When this window resets (can be nil)
+	Label       string     `json:"label"`       // e.g., "5-Hour", "7-Day", "Daily"
+	Utilization float64    `json:"utilization"` // 0-100 percentage
+	ResetsAt    *time.Time `json:"resets_at"`   // When this window resets (can be nil)
 
 	// Additional provider-specific fields
-	Limit     *float64 // Usage limit (e.g., token count)
-	Used      *float64 // Amount used
-	Remaining *float64 // Amount remaining
+	Limit     *float64 `json:"limit,omitempty"`     // Usage limit (e.g., token count)
+	Used      *float64 `json:"used,omitempty"`      // Amount used
+	Remaining *float64 `json:"remaining,omitempty"` // Amount remaining
 }
 
 // TimeUntilReset returns the duration until the window resets
@@ -56,7 +56,7 @@ func (w *UsageWindow) TimeUntilReset() *time.Duration {
 
 // UsageStats aggregates results from multiple providers
 type UsageStats struct {
-	Providers []Usage
+	Providers []Usage `json:"providers"`
 }
 
 // MaxUtilization returns the maximum utilization across all providers

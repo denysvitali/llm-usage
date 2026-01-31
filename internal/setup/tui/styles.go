@@ -73,7 +73,7 @@ var (
 
 	// Input placeholder style
 	inputPlaceholderStyle = lipgloss.NewStyle().
-			Foreground(dimColor)
+				Foreground(dimColor)
 
 	// Border style
 	borderStyle = lipgloss.NewStyle().
@@ -176,17 +176,17 @@ func RenderInputField(label, value, placeholder string, isActive, isPassword boo
 
 // RenderError returns a styled error message
 func RenderError(msg string) string {
-	return errorStyle.Render("✗ "+msg)
+	return errorStyle.Render("✗ " + msg)
 }
 
 // RenderSuccess returns a styled success message
 func RenderSuccess(msg string) string {
-	return successStyle.Render("✓ "+msg)
+	return successStyle.Render("✓ " + msg)
 }
 
 // RenderWarning returns a styled warning message
 func RenderWarning(msg string) string {
-	return warningStyle.Render("⚠ "+msg)
+	return warningStyle.Render("⚠ " + msg)
 }
 
 // RenderSeparator returns a horizontal separator

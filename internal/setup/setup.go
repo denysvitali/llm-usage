@@ -10,8 +10,14 @@ import (
 	"github.com/denysvitali/llm-usage/internal/credentials"
 )
 
-// SetupWizard runs an interactive setup wizard for first-time users
-func SetupWizard(mgr *credentials.Manager) error {
+const (
+	providerClaude = "claude"
+	providerKimi   = "kimi"
+	providerZAi    = "zai"
+)
+
+// Wizard runs an interactive setup wizard for first-time users
+func Wizard(mgr *credentials.Manager) error {
 	fmt.Println("Welcome to llm-usage setup!")
 	fmt.Println("This wizard will help you configure your LLM provider credentials.")
 	fmt.Println()
@@ -20,9 +26,9 @@ func SetupWizard(mgr *credentials.Manager) error {
 		id   string
 		name string
 	}{
-		{"claude", "Claude (Anthropic)"},
-		{"kimi", "Kimi"},
-		{"zai", "Z.AI"},
+		{providerClaude, "Claude (Anthropic)"},
+		{providerKimi, "Kimi"},
+		{providerZAi, "Z.AI"},
 	}
 
 	for _, p := range providers {
@@ -42,12 +48,12 @@ func SetupWizard(mgr *credentials.Manager) error {
 func AddAccount(mgr *credentials.Manager, providerID, accountName string) error {
 	// Validate provider
 	switch providerID {
-	case "claude":
+	case providerClaude:
 		return addClaudeAccount(mgr, accountName)
-	case "kimi":
-		return addKimiAccount(mgr, accountName)
-	case "zai":
-		return addZaiAccount(mgr, accountName)
+	case providerKimi:
+		return addAPIKeyAccount(mgr, providerKimi, "Kimi", accountName)
+	case providerZAi:
+		return addAPIKeyAccount(mgr, providerZAi, "Z.AI", accountName)
 	default:
 		return fmt.Errorf("unknown provider: %s", providerID)
 	}
@@ -83,10 +89,10 @@ func addClaudeAccount(mgr *credentials.Manager, _ string) error {
 	return nil
 }
 
-// addKimiAccount adds a Kimi account
-func addKimiAccount(mgr *credentials.Manager, accountName string) error {
-	fmt.Println("\nKimi Setup")
-	fmt.Println("==========")
+// addAPIKeyAccount adds an account for API key-based providers (Kimi, Z.AI)
+func addAPIKeyAccount(mgr *credentials.Manager, providerID, displayName, accountName string) error {
+	fmt.Printf("\n%s Setup\n", displayName)
+	fmt.Println(strings.Repeat("=", len(displayName)+6))
 	fmt.Println()
 
 	// Get account name if not provided
@@ -99,36 +105,47 @@ func addKimiAccount(mgr *credentials.Manager, accountName string) error {
 	}
 
 	// Get API key
-	fmt.Print("Enter your Kimi API key: ")
+	fmt.Printf("Enter your %s API key: ", displayName)
 	apiKey := readLine()
 	if apiKey == "" {
 		return fmt.Errorf("API key is required")
 	}
 
-	// Load existing credentials or create new
+	return saveAPIKeyCredentials(mgr, providerID, accountName, apiKey)
+}
+
+// saveAPIKeyCredentials saves credentials for API key-based providers
+func saveAPIKeyCredentials(mgr *credentials.Manager, providerID, accountName, apiKey string) error {
+	switch providerID {
+	case providerKimi:
+		return saveKimiCredentials(mgr, accountName, apiKey)
+	case providerZAi:
+		return saveZAiCredentials(mgr, accountName, apiKey)
+	default:
+		return fmt.Errorf("unsupported provider: %s", providerID)
+	}
+}
+
+// saveKimiCredentials saves Kimi credentials
+func saveKimiCredentials(mgr *credentials.Manager, accountName, apiKey string) error {
 	var creds credentials.KimiCredentials
-	if mgr.ProviderExists("kimi") {
-		if err := mgr.LoadProvider("kimi", &creds); err != nil {
-			// If load fails, start fresh
+	if mgr.ProviderExists(providerKimi) {
+		if err := mgr.LoadProvider(providerKimi, &creds); err != nil {
 			creds = credentials.KimiCredentials{}
 		}
 	}
 
-	// Initialize accounts map if needed
 	if creds.Accounts == nil {
 		creds.Accounts = make(map[string]*credentials.KimiAccount)
-		// Migrate legacy API key if present
 		if creds.APIKey != "" {
 			creds.Accounts["default"] = &credentials.KimiAccount{APIKey: creds.APIKey}
-			creds.APIKey = "" // Clear legacy field
+			creds.APIKey = ""
 		}
 	}
 
-	// Add/update account
 	creds.Accounts[accountName] = &credentials.KimiAccount{APIKey: apiKey}
 
-	// Save credentials
-	if err := mgr.SaveProvider("kimi", creds); err != nil {
+	if err := mgr.SaveProvider(providerKimi, creds); err != nil {
 		return fmt.Errorf("failed to save credentials: %w", err)
 	}
 
@@ -136,52 +153,26 @@ func addKimiAccount(mgr *credentials.Manager, accountName string) error {
 	return nil
 }
 
-// addZaiAccount adds a Z.AI account
-func addZaiAccount(mgr *credentials.Manager, accountName string) error {
-	fmt.Println("\nZ.AI Setup")
-	fmt.Println("==========")
-	fmt.Println()
-
-	// Get account name if not provided
-	if accountName == "" {
-		fmt.Print("Enter account name (default): ")
-		accountName = readLine()
-		if accountName == "" {
-			accountName = "default"
-		}
-	}
-
-	// Get API key
-	fmt.Print("Enter your Z.AI API key: ")
-	apiKey := readLine()
-	if apiKey == "" {
-		return fmt.Errorf("API key is required")
-	}
-
-	// Load existing credentials or create new
+// saveZAiCredentials saves Z.AI credentials
+func saveZAiCredentials(mgr *credentials.Manager, accountName, apiKey string) error {
 	var creds credentials.ZAiCredentials
-	if mgr.ProviderExists("zai") {
-		if err := mgr.LoadProvider("zai", &creds); err != nil {
-			// If load fails, start fresh
+	if mgr.ProviderExists(providerZAi) {
+		if err := mgr.LoadProvider(providerZAi, &creds); err != nil {
 			creds = credentials.ZAiCredentials{}
 		}
 	}
 
-	// Initialize accounts map if needed
 	if creds.Accounts == nil {
 		creds.Accounts = make(map[string]*credentials.ZAiAccount)
-		// Migrate legacy API key if present
 		if creds.APIKey != "" {
 			creds.Accounts["default"] = &credentials.ZAiAccount{APIKey: creds.APIKey}
-			creds.APIKey = "" // Clear legacy field
+			creds.APIKey = ""
 		}
 	}
 
-	// Add/update account
 	creds.Accounts[accountName] = &credentials.ZAiAccount{APIKey: apiKey}
 
-	// Save credentials
-	if err := mgr.SaveProvider("zai", creds); err != nil {
+	if err := mgr.SaveProvider(providerZAi, creds); err != nil {
 		return fmt.Errorf("failed to save credentials: %w", err)
 	}
 
@@ -407,11 +398,11 @@ func MigrateClaudeCLI(mgr *credentials.Manager) error {
 // providerName returns the display name for a provider
 func providerName(id string) string {
 	switch id {
-	case "claude":
+	case providerClaude:
 		return "Claude (Anthropic)"
-	case "kimi":
+	case providerKimi:
 		return "Kimi"
-	case "zai":
+	case providerZAi:
 		return "Z.AI"
 	default:
 		return strings.ToUpper(id)

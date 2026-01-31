@@ -126,8 +126,8 @@ func (m *Manager) LoadZAi() (*ZAiCredentials, error) {
 
 // ClaudeCredentials represents Claude OAuth credentials with multi-account support
 type ClaudeCredentials struct {
-	ClaudeAiOauth *OAuthCredentials              `json:"claudeAiOauth,omitempty"` // Legacy single-account format
-	Accounts      map[string]*ClaudeAccount      `json:"accounts,omitempty"`      // Multi-account format
+	ClaudeAiOauth *OAuthCredentials         `json:"claudeAiOauth,omitempty"` // Legacy single-account format
+	Accounts      map[string]*ClaudeAccount `json:"accounts,omitempty"`      // Multi-account format
 }
 
 // ClaudeAccount represents a single Claude account's credentials

@@ -76,8 +76,8 @@
         </div>
 
         <!-- Stats grid -->
-        <div x-show="!loading || stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <template x-for="provider in filteredStats" :key="provider.provider">
+        <div x-show="stats?.providers?.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <template x-for="(provider, index) in filteredStats" :key="provider.provider + '-' + (provider.extra?.account || index)">
                 <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition-colors">
                     <!-- Provider header -->
                     <div class="flex items-center justify-between mb-4">
@@ -171,7 +171,7 @@
         function usageDashboard() {
             return {
                 stats: null,
-                loading: false,
+                loading: true,
                 error: null,
                 autoRefresh: true,
                 refreshInterval: null,
@@ -234,7 +234,7 @@
                 },
 
                 get filteredStats() {
-                    if (!this.stats?.providers) return [];
+                    if (!this.stats || !Array.isArray(this.stats.providers)) return [];
                     return this.stats.providers;
                 },
 

@@ -171,9 +171,18 @@ func (s *Server) handleProviders(w http.ResponseWriter, _ *http.Request) {
 			if creds, err := s.credsMgr.LoadClaude(); err == nil {
 				accounts = creds.ListAccounts()
 			}
-			// Check for keychain credentials
+			// Check for keychain credentials (only add "default" if not already present)
 			if _, _, err := usage.LoadClaudeFromKeychain(); err == nil {
-				accounts = append(accounts, "default")
+				found := false
+				for _, acc := range accounts {
+					if acc == "default" {
+						found = true
+						break
+					}
+				}
+				if !found {
+					accounts = append(accounts, "default")
+				}
 			}
 		case providerKimi:
 			if creds, err := s.credsMgr.LoadKimi(); err == nil {
