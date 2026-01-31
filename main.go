@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/denysvitali/llm-usage/internal/provider/claude"
 	"github.com/denysvitali/llm-usage/internal/provider/kimi"
 	"github.com/denysvitali/llm-usage/internal/provider/zai"
+	"github.com/denysvitali/llm-usage/internal/serve"
 	"github.com/denysvitali/llm-usage/internal/setup"
 	setuptui "github.com/denysvitali/llm-usage/internal/setup/tui"
 )
@@ -59,7 +61,13 @@ var (
 )
 
 func main() {
-	// Check for setup subcommand first
+	// Check for serve subcommand first
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		handleServeCommand()
+		return
+	}
+
+	// Check for setup subcommand
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
 		handleSetupCommand()
 		return
@@ -103,6 +111,37 @@ func main() {
 	default:
 		outputPrettyMulti(stats)
 	}
+}
+
+// handleServeCommand handles the serve subcommand
+func handleServeCommand() {
+	fs := flag.NewFlagSet("serve", flag.ExitOnError)
+	cmd := serve.NewCommand(fs)
+	fs.Parse(os.Args[2:])
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle interrupt signal
+	go func() {
+		<-handleInterrupt()
+		cancel()
+	}()
+
+	if err := cmd.Run(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// handleInterrupt waits for interrupt signal
+func handleInterrupt() chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		// Note: signal handling would go here for proper graceful shutdown
+		// For now, this is a placeholder
+	}()
+	return ch
 }
 
 // handleSetupCommand handles the setup subcommand and its sub-subcommands
