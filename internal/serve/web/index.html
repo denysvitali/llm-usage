@@ -162,6 +162,40 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Kimi subscription -->
+                    <div x-show="provider.extra?.subscription" class="mt-4 pt-4 border-t border-gray-700">
+                        <p class="text-sm font-medium text-cyan-400 mb-2">Subscription</p>
+                        <div class="space-y-2">
+                            <!-- Plan info -->
+                            <div x-show="provider.extra?.subscription?.plan" class="flex items-center gap-2">
+                                <span class="text-sm text-gray-300" x-text="provider.extra?.subscription?.plan?.title"></span>
+                                <span class="text-xs text-gray-500" x-text="'(' + (provider.extra?.subscription?.plan?.level || '') + ')'"></span>
+                                <span :class="provider.extra?.subscription?.plan?.status === 'Active' ? 'text-green-400' : (provider.extra?.subscription?.plan?.status === 'Cancelled' ? 'text-yellow-400' : 'text-red-400')"
+                                      class="text-xs font-medium"
+                                      x-text="provider.extra?.subscription?.plan?.status"></span>
+                            </div>
+                            <!-- Expiry date -->
+                            <div x-show="provider.extra?.subscription?.expires_at" class="flex justify-between text-xs text-gray-500">
+                                <span>Expires:</span>
+                                <span x-text="formatSubscriptionExpiry(provider.extra?.subscription?.expires_at)"></span>
+                            </div>
+                            <!-- Feature quotas -->
+                            <template x-for="feature in (provider.extra?.subscription?.features || [])" :key="feature.feature">
+                                <div class="space-y-1">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-xs font-medium text-blue-400" x-text="feature.feature"></span>
+                                        <span class="text-xs text-gray-500" x-text="feature.left + '/' + feature.total + ' left'"></span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                                        <div :class="getFeatureUtilizationClass(feature)"
+                                             class="h-1.5 rounded-full transition-all duration-500"
+                                             :style="'width: ' + getFeatureUtilization(feature) + '%'"></div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                 </div>
             </template>
         </div>
@@ -335,6 +369,36 @@
                         }
                     }
                     this.refresh();
+                },
+
+                formatSubscriptionExpiry(isoString) {
+                    if (!isoString) return '';
+                    const now = new Date();
+                    const expiry = new Date(isoString);
+                    const diff = expiry - now;
+
+                    const dateStr = expiry.toLocaleDateString();
+
+                    if (diff < 0) return dateStr + ' (expired)';
+
+                    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    if (days > 0) return dateStr + ' (' + days + 'd remaining)';
+
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    return dateStr + ' (' + hours + 'h remaining)';
+                },
+
+                getFeatureUtilization(feature) {
+                    if (!feature || feature.total === 0) return 0;
+                    // Show used percentage (total - left = used)
+                    return Math.round(((feature.total - feature.left) / feature.total) * 100);
+                },
+
+                getFeatureUtilizationClass(feature) {
+                    const used = this.getFeatureUtilization(feature);
+                    if (used >= 90) return 'bg-red-500';
+                    if (used >= 75) return 'bg-yellow-500';
+                    return 'bg-green-500';
                 }
             };
         }

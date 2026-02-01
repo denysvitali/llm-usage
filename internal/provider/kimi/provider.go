@@ -7,18 +7,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/denysvitali/llm-usage/internal/cache"
 	"github.com/denysvitali/llm-usage/internal/provider"
+)
+
+const (
+	subscriptionCacheTTL = 30 * time.Minute
 )
 
 // Provider implements the provider.Provider interface for Kimi
 type Provider struct {
 	client *Client
+	cache  *cache.Manager
 }
 
 // NewProvider creates a new Kimi provider with the given API key
 func NewProvider(apiKey string) *Provider {
 	return &Provider{
 		client: NewClient(apiKey),
+		cache:  cache.NewManager(),
 	}
 }
 
@@ -55,10 +62,20 @@ func (p *Provider) GetUsage() (*provider.Usage, error) {
 		}
 	}
 
-	return &provider.Usage{
+	usage := &provider.Usage{
 		Provider: "kimi",
 		Windows:  windows,
-	}, nil
+	}
+
+	// Fetch subscription info (with caching)
+	if sub := p.getSubscription(); sub != nil {
+		if usage.Extra == nil {
+			usage.Extra = make(map[string]any)
+		}
+		usage.Extra["subscription"] = p.formatSubscriptionExtra(sub)
+	}
+
+	return usage, nil
 }
 
 // parseScopeWindow parses the main scope usage detail into a UsageWindow
@@ -153,4 +170,109 @@ func (p *Provider) formatDurationLabel(duration int, timeUnit string) string {
 	}
 
 	return fmt.Sprintf("%d-%s Rate Limit", duration, unit)
+}
+
+// getSubscription fetches subscription info with caching
+func (p *Provider) getSubscription() *SubscriptionResponse {
+	cacheKey := cache.HashKey("kimi_subscription", p.client.APIKey())
+
+	// Try to get from cache
+	var cached SubscriptionResponse
+	if found, err := p.cache.Get(cacheKey, &cached); err == nil && found {
+		return &cached
+	}
+
+	// Fetch from API
+	sub, err := p.client.GetSubscription()
+	if err != nil {
+		return nil
+	}
+
+	// Cache the result
+	_ = p.cache.Set(cacheKey, sub, subscriptionCacheTTL)
+
+	return sub
+}
+
+// formatSubscriptionExtra formats subscription data for the Extra map
+func (p *Provider) formatSubscriptionExtra(sub *SubscriptionResponse) map[string]any {
+	result := map[string]any{
+		"subscribed": sub.Subscribed,
+	}
+
+	if sub.Subscription != nil {
+		// Parse expiry date
+		var expiresAt *time.Time
+		if sub.Subscription.CurrentEndTime != "" {
+			if t, err := time.Parse(time.RFC3339Nano, sub.Subscription.CurrentEndTime); err == nil {
+				expiresAt = &t
+			}
+		}
+
+		// Format status for display
+		status := formatSubscriptionStatus(sub.Subscription.Status)
+
+		plan := map[string]any{
+			"title":  sub.Subscription.Goods.Title,
+			"level":  formatMembershipLevel(sub.Subscription.Goods.MembershipLevel),
+			"status": status,
+		}
+		result["plan"] = plan
+
+		if expiresAt != nil {
+			result["expires_at"] = expiresAt.Format(time.RFC3339)
+		}
+	}
+
+	if len(sub.Memberships) > 0 {
+		features := make([]map[string]any, 0, len(sub.Memberships))
+		for _, m := range sub.Memberships {
+			features = append(features, map[string]any{
+				"feature": formatFeatureName(m.Feature),
+				"left":    m.LeftCount,
+				"total":   m.TotalCount,
+			})
+		}
+		result["features"] = features
+	}
+
+	return result
+}
+
+// formatSubscriptionStatus converts status constants to display strings
+func formatSubscriptionStatus(status string) string {
+	switch status {
+	case "SUBSCRIPTION_STATUS_ACTIVE":
+		return "Active"
+	case "SUBSCRIPTION_STATUS_CANCELLED":
+		return "Cancelled"
+	case "SUBSCRIPTION_STATUS_EXPIRED":
+		return "Expired"
+	default:
+		return strings.TrimPrefix(status, "SUBSCRIPTION_STATUS_")
+	}
+}
+
+// formatMembershipLevel converts level constants to display strings
+func formatMembershipLevel(level string) string {
+	switch level {
+	case "LEVEL_BASIC":
+		return "Basic"
+	case "LEVEL_STANDARD":
+		return "Standard"
+	case "LEVEL_PREMIUM":
+		return "Premium"
+	default:
+		return strings.TrimPrefix(level, "LEVEL_")
+	}
+}
+
+// formatFeatureName converts feature constants to display strings
+func formatFeatureName(feature string) string {
+	// Convert FEATURE_CODING to "Coding"
+	name := strings.TrimPrefix(feature, "FEATURE_")
+	if len(name) > 0 {
+		return strings.ToUpper(name[:1]) + strings.ToLower(name[1:])
+	}
+	return name
 }

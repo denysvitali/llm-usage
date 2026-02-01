@@ -1,0 +1,124 @@
+package cache
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestManager_SetAndGet(t *testing.T) {
+	// Create a temp directory for cache
+	tmpDir := t.TempDir()
+
+	m := &Manager{cacheDir: tmpDir}
+
+	type testData struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	}
+
+	// Test Set
+	data := testData{Name: "test", Value: 42}
+	err := m.Set("test_key", data, time.Hour)
+	if err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(filepath.Join(tmpDir, "test_key.json")); os.IsNotExist(err) {
+		t.Error("Cache file was not created")
+	}
+
+	// Test Get
+	var retrieved testData
+	found, err := m.Get("test_key", &retrieved)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if !found {
+		t.Error("Expected cache hit, got miss")
+	}
+	if retrieved.Name != "test" || retrieved.Value != 42 {
+		t.Errorf("Retrieved data doesn't match: got %+v", retrieved)
+	}
+}
+
+func TestManager_CacheMiss(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := &Manager{cacheDir: tmpDir}
+
+	var data struct{}
+	found, err := m.Get("nonexistent", &data)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if found {
+		t.Error("Expected cache miss, got hit")
+	}
+}
+
+func TestManager_Expiry(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := &Manager{cacheDir: tmpDir}
+
+	// Set with very short TTL
+	data := map[string]string{"key": "value"}
+	err := m.Set("expiring", data, time.Millisecond)
+	if err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	// Wait for expiry
+	time.Sleep(10 * time.Millisecond)
+
+	// Should be expired now
+	var retrieved map[string]string
+	found, err := m.Get("expiring", &retrieved)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if found {
+		t.Error("Expected cache miss due to expiry, got hit")
+	}
+}
+
+func TestHashKey(t *testing.T) {
+	key1 := HashKey("prefix", "value1")
+	key2 := HashKey("prefix", "value2")
+	key3 := HashKey("prefix", "value1")
+
+	if key1 == key2 {
+		t.Error("Different values should produce different keys")
+	}
+	if key1 != key3 {
+		t.Error("Same values should produce same keys")
+	}
+	if len(key1) < 10 {
+		t.Error("Key should be reasonably long")
+	}
+}
+
+func TestManager_Clear(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := &Manager{cacheDir: tmpDir}
+
+	// Create some cache entries
+	_ = m.Set("key1", "value1", time.Hour)
+	_ = m.Set("key2", "value2", time.Hour)
+
+	// Clear cache
+	err := m.Clear()
+	if err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+
+	// Verify entries are gone
+	var data string
+	found1, _ := m.Get("key1", &data)
+	found2, _ := m.Get("key2", &data)
+
+	if found1 || found2 {
+		t.Error("Cache entries should be cleared")
+	}
+}

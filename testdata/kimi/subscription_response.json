@@ -1,0 +1,25 @@
+{
+    "subscription": {
+        "subscriptionId": "sub_test_12345",
+        "goods": {
+            "title": "Moderato",
+            "membershipLevel": "LEVEL_BASIC",
+            "amounts": [{"currency": "USD", "priceInCents": "1900"}],
+            "billingCycle": {"duration": 1, "timeUnit": "TIME_UNIT_MONTH"}
+        },
+        "currentStartTime": "2026-01-01T00:00:00Z",
+        "currentEndTime": "2026-02-01T00:00:00Z",
+        "status": "SUBSCRIPTION_STATUS_ACTIVE"
+    },
+    "memberships": [
+        {
+            "feature": "FEATURE_CODING",
+            "leftCount": 15,
+            "totalCount": 20,
+            "level": "LEVEL_BASIC",
+            "startTime": "2026-01-01T00:00:00Z",
+            "endTime": "2026-02-01T00:00:00Z"
+        }
+    ],
+    "subscribed": true
+}

@@ -7,7 +7,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/denysvitali/llm-usage/internal/provider"
+)
+
+// Lipgloss styles for subscription display
+var (
+	subscriptionTitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
+	statusActiveStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
+	statusCancelledStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	statusExpiredStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	dimStyle               = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	featureNameStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
 )
 
 const (
@@ -135,6 +146,11 @@ func OutputPretty(stats *provider.UsageStats) {
 			printExtraUsageFromMap(extra)
 		}
 
+		// Print subscription info if available (for Kimi)
+		if sub, ok := p.Extra["subscription"]; ok {
+			printKimiSubscription(sub)
+		}
+
 		fmt.Println()
 	}
 }
@@ -233,4 +249,93 @@ func providerShortName(id string) string {
 	default:
 		return string(strings.ToUpper(id)[0])
 	}
+}
+
+// printKimiSubscription prints Kimi subscription info with colors
+func printKimiSubscription(sub any) {
+	subMap, ok := sub.(map[string]any)
+	if !ok {
+		return
+	}
+
+	fmt.Println(subscriptionTitleStyle.Render("Subscription:"))
+
+	// Print plan info
+	if plan, ok := subMap["plan"].(map[string]any); ok {
+		title := getStringValue(plan, "title")
+		level := getStringValue(plan, "level")
+		status := getStringValue(plan, "status")
+
+		// Style the status based on its value
+		var styledStatus string
+		switch status {
+		case "Active":
+			styledStatus = statusActiveStyle.Render(status)
+		case "Cancelled":
+			styledStatus = statusCancelledStyle.Render(status)
+		case "Expired":
+			styledStatus = statusExpiredStyle.Render(status)
+		default:
+			styledStatus = status
+		}
+
+		fmt.Printf("  Plan:     %s %s %s\n", title, dimStyle.Render("("+level+")"), styledStatus)
+	}
+
+	// Print expiry info
+	if expiresAt, ok := subMap["expires_at"].(string); ok && expiresAt != "" {
+		if t, err := time.Parse(time.RFC3339, expiresAt); err == nil {
+			remaining := time.Until(t)
+			var expiryStr string
+			if remaining > 0 {
+				expiryStr = fmt.Sprintf("%s %s", t.Format("2006-01-02"), dimStyle.Render("("+FormatDuration(remaining)+" remaining)"))
+			} else {
+				expiryStr = statusExpiredStyle.Render(t.Format("2006-01-02") + " (expired)")
+			}
+			fmt.Printf("  Expires:  %s\n", expiryStr)
+		}
+	}
+
+	// Print features/quotas
+	if features, ok := subMap["features"].([]any); ok && len(features) > 0 {
+		fmt.Println("  Features:")
+		for _, f := range features {
+			if feature, ok := f.(map[string]any); ok {
+				name := getStringValue(feature, "feature")
+				left := getIntValue(feature, "left")
+				total := getIntValue(feature, "total")
+
+				// Calculate percentage for progress bar
+				var percentage float64
+				if total > 0 {
+					percentage = float64(total-left) / float64(total) * 100
+				}
+				bar := RenderProgressBar(percentage)
+
+				fmt.Printf("    %s: %s %s\n",
+					featureNameStyle.Render(name),
+					bar,
+					dimStyle.Render(fmt.Sprintf("%d/%d left", left, total)))
+			}
+		}
+	}
+}
+
+// getStringValue safely extracts a string value from a map
+func getStringValue(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// getIntValue safely extracts an int value from a map (handles float64 from JSON)
+func getIntValue(m map[string]any, key string) int {
+	if v, ok := m[key].(float64); ok {
+		return int(v)
+	}
+	if v, ok := m[key].(int); ok {
+		return v
+	}
+	return 0
 }
