@@ -25,8 +25,13 @@ func (m Model) updateProviderSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Claude requires special handling (OAuth)
 		if provider.ID == "claude" {
 			m.selectedProvider = provider.ID
-			// For Claude, we show a special screen explaining OAuth
 			m.errorMsg = "Claude uses OAuth. Please run: llm-usage setup add claude"
+			return m, nil
+		}
+		// MiniMax requires multiple fields (cookie + group ID)
+		if provider.ID == "minimax" {
+			m.selectedProvider = provider.ID
+			m.errorMsg = "MiniMax requires multiple fields. Please run: llm-usage setup add minimax"
 			return m, nil
 		}
 		m.selectedProvider = provider.ID

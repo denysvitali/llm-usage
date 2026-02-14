@@ -22,7 +22,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:     "llm-usage",
 	Short:   "Display LLM API usage statistics",
-	Long:    `llm-usage displays API usage statistics across multiple LLM providers including Claude, Kimi, and Z.AI.`,
+	Long:    `llm-usage displays API usage statistics across multiple LLM providers including Claude, Kimi, Z.AI, and MiniMax.`,
 	Version: version.Version,
 	RunE:    runUsage,
 }
@@ -35,7 +35,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&providerFlag, "provider", "p", "all", "Provider: claude, kimi, zai, or all")
+	rootCmd.Flags().StringVarP(&providerFlag, "provider", "p", "all", "Provider: claude, kimi, zai, minimax, or all")
 	rootCmd.Flags().StringVarP(&accountFlag, "account", "a", "", "Account to use")
 	rootCmd.Flags().BoolVar(&allAccountsFlag, "all-accounts", false, "Aggregate usage across all accounts")
 	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")

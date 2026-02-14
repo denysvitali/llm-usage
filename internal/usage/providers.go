@@ -11,13 +11,15 @@ import (
 	"github.com/denysvitali/llm-usage/internal/provider"
 	"github.com/denysvitali/llm-usage/internal/provider/claude"
 	"github.com/denysvitali/llm-usage/internal/provider/kimi"
+	"github.com/denysvitali/llm-usage/internal/provider/minimax"
 	"github.com/denysvitali/llm-usage/internal/provider/zai"
 )
 
 const (
-	providerClaude = "claude"
-	providerKimi   = "kimi"
-	providerZAi    = "zai"
+	providerClaude  = "claude"
+	providerKimi    = "kimi"
+	providerZAi     = "zai"
+	providerMiniMax = "minimax"
 )
 
 // ProviderInstance holds a provider instance along with its account info
@@ -78,6 +80,8 @@ func GetProviders(providerFlag, accountFlag string, allAccounts bool, credsMgr *
 			providers = append(providers, getKimiProviders(accountFlag, allAccounts, credsMgr)...)
 		case providerZAi:
 			providers = append(providers, getZaiProviders(accountFlag, allAccounts, credsMgr)...)
+		case providerMiniMax:
+			providers = append(providers, getMiniMaxProviders(accountFlag, allAccounts, credsMgr)...)
 		}
 	}
 
@@ -210,6 +214,42 @@ func getZaiProviders(accountFlag string, allAccounts bool, credsMgr *credentials
 		}
 		providers = append(providers, ProviderInstance{
 			Provider:    zai.NewProvider(acc.APIKey),
+			AccountName: accountFlag,
+		})
+	}
+
+	return providers
+}
+
+// getMiniMaxProviders returns MiniMax provider instances
+func getMiniMaxProviders(accountFlag string, allAccounts bool, credsMgr *credentials.Manager) []ProviderInstance {
+	var providers []ProviderInstance
+
+	creds, err := credsMgr.LoadMiniMax()
+	if err != nil {
+		return providers
+	}
+
+	if allAccounts || accountFlag == "" {
+		// Add all accounts when --all-accounts is set or no specific account requested
+		for _, accName := range creds.ListAccounts() {
+			acc := creds.GetAccount(accName)
+			if acc == nil {
+				continue
+			}
+			providers = append(providers, ProviderInstance{
+				Provider:    minimax.NewProvider(acc.Cookie, acc.GroupID),
+				AccountName: accName,
+			})
+		}
+	} else {
+		// Use specified account
+		acc := creds.GetAccount(accountFlag)
+		if acc == nil {
+			return providers
+		}
+		providers = append(providers, ProviderInstance{
+			Provider:    minimax.NewProvider(acc.Cookie, acc.GroupID),
 			AccountName: accountFlag,
 		})
 	}

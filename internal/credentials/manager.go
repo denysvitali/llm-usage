@@ -121,6 +121,15 @@ func (m *Manager) LoadZAi() (*ZAiCredentials, error) {
 	return &creds, nil
 }
 
+// LoadMiniMax loads MiniMax credentials from the config file
+func (m *Manager) LoadMiniMax() (*MiniMaxCredentials, error) {
+	var creds MiniMaxCredentials
+	if err := m.LoadProvider("minimax", &creds); err != nil {
+		return nil, err
+	}
+	return &creds, nil
+}
+
 // ClaudeCredentials represents Claude OAuth credentials with multi-account support
 type ClaudeCredentials struct {
 	ClaudeAiOauth *OAuthCredentials         `json:"claudeAiOauth,omitempty"` // Legacy single-account format
@@ -341,6 +350,82 @@ func (z *ZAiCredentials) Validate() error {
 	return nil
 }
 
+// MiniMaxCredentials represents MiniMax credentials with multi-account support
+type MiniMaxCredentials struct {
+	Cookie   string                     `json:"cookie,omitempty"`
+	GroupID  string                     `json:"groupId,omitempty"`
+	Accounts map[string]*MiniMaxAccount `json:"accounts,omitempty"`
+}
+
+// MiniMaxAccount represents a single MiniMax account's credentials
+type MiniMaxAccount struct {
+	Cookie  string `json:"cookie"`
+	GroupID string `json:"groupId"`
+}
+
+// GetAccount returns the specified account's credentials, or the default/first available account
+func (m *MiniMaxCredentials) GetAccount(accountName string) *MiniMaxAccount {
+	// Try multi-account format first
+	if m.Accounts != nil {
+		if accountName == "" {
+			// Try "default" first, then fall back to first account
+			if acc, ok := m.Accounts["default"]; ok {
+				return acc
+			}
+			for _, acc := range m.Accounts {
+				return acc
+			}
+		} else {
+			if acc, ok := m.Accounts[accountName]; ok {
+				return acc
+			}
+		}
+	}
+
+	// Fall back to legacy format
+	if m.Cookie != "" {
+		return &MiniMaxAccount{Cookie: m.Cookie, GroupID: m.GroupID}
+	}
+	return nil
+}
+
+// ListAccounts returns all account names for this provider
+func (m *MiniMaxCredentials) ListAccounts() []string {
+	if m.Accounts != nil {
+		names := make([]string, 0, len(m.Accounts))
+		for name := range m.Accounts {
+			names = append(names, name)
+		}
+		return names
+	}
+	if m.Cookie != "" {
+		return []string{"default"}
+	}
+	return nil
+}
+
+// Validate checks if the MiniMax credentials are valid
+func (m *MiniMaxCredentials) Validate() error {
+	if len(m.Accounts) > 0 {
+		for name, acc := range m.Accounts {
+			if acc.Cookie == "" {
+				return fmt.Errorf("no cookie found for account %q", name)
+			}
+			if acc.GroupID == "" {
+				return fmt.Errorf("no group ID found for account %q", name)
+			}
+		}
+		return nil
+	}
+	if m.Cookie == "" {
+		return fmt.Errorf("no cookie found")
+	}
+	if m.GroupID == "" {
+		return fmt.Errorf("no group ID found")
+	}
+	return nil
+}
+
 // SaveProvider saves provider credentials to the config file
 func (m *Manager) SaveProvider(providerID string, data any) error {
 	if err := m.EnsureConfigDir(); err != nil {
@@ -390,6 +475,12 @@ func (m *Manager) ListAccounts(providerID string) ([]string, error) {
 		return creds.ListAccounts(), nil
 	case "zai":
 		creds, err := m.LoadZAi()
+		if err != nil {
+			return nil, err
+		}
+		return creds.ListAccounts(), nil
+	case "minimax":
+		creds, err := m.LoadMiniMax()
 		if err != nil {
 			return nil, err
 		}

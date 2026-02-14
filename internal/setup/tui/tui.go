@@ -20,6 +20,7 @@ type Provider struct {
 var AllProviders = []Provider{
 	{ID: "claude", Name: "Claude (Anthropic)"},
 	{ID: "kimi", Name: "Kimi"},
+	{ID: "minimax", Name: "MiniMax"},
 	{ID: "zai", Name: "Z.AI"},
 }
 

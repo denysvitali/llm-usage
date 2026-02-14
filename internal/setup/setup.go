@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	providerClaude = "claude"
-	providerKimi   = "kimi"
-	providerZAi    = "zai"
+	providerClaude  = "claude"
+	providerKimi    = "kimi"
+	providerZAi     = "zai"
+	providerMiniMax = "minimax"
 )
 
 // Wizard runs an interactive setup wizard for first-time users
@@ -29,6 +30,7 @@ func Wizard(mgr *credentials.Manager) error {
 		{providerClaude, "Claude (Anthropic)"},
 		{providerKimi, "Kimi"},
 		{providerZAi, "Z.AI"},
+		{providerMiniMax, "MiniMax"},
 	}
 
 	for _, p := range providers {
@@ -54,6 +56,8 @@ func AddAccount(mgr *credentials.Manager, providerID, accountName string) error 
 		return addAPIKeyAccount(mgr, providerKimi, "Kimi", accountName)
 	case providerZAi:
 		return addAPIKeyAccount(mgr, providerZAi, "Z.AI", accountName)
+	case providerMiniMax:
+		return addMiniMaxAccount(mgr, accountName)
 	default:
 		return fmt.Errorf("unknown provider: %s", providerID)
 	}
@@ -112,6 +116,40 @@ func addAPIKeyAccount(mgr *credentials.Manager, providerID, displayName, account
 	}
 
 	return saveAPIKeyCredentials(mgr, providerID, accountName, apiKey)
+}
+
+// addMiniMaxAccount adds a MiniMax account
+func addMiniMaxAccount(mgr *credentials.Manager, accountName string) error {
+	fmt.Println("\nMiniMax Setup")
+	fmt.Println("=============")
+	fmt.Println()
+	fmt.Println("MiniMax uses cookie-based authentication.")
+	fmt.Println()
+
+	// Get account name if not provided
+	if accountName == "" {
+		fmt.Print("Enter account name (default): ")
+		accountName = readLine()
+		if accountName == "" {
+			accountName = "default"
+		}
+	}
+
+	// Get Group ID
+	fmt.Print("Enter your MiniMax Group ID: ")
+	groupID := readLine()
+	if groupID == "" {
+		return fmt.Errorf("group ID is required")
+	}
+
+	// Get Cookie
+	fmt.Print("Enter your MiniMax cookie: ")
+	cookie := readLine()
+	if cookie == "" {
+		return fmt.Errorf("cookie is required")
+	}
+
+	return saveMiniMaxCredentials(mgr, accountName, cookie, groupID)
 }
 
 // saveAPIKeyCredentials saves credentials for API key-based providers
@@ -180,6 +218,34 @@ func saveZAiCredentials(mgr *credentials.Manager, accountName, apiKey string) er
 	return nil
 }
 
+// saveMiniMaxCredentials saves MiniMax credentials
+func saveMiniMaxCredentials(mgr *credentials.Manager, accountName, cookie, groupID string) error {
+	var creds credentials.MiniMaxCredentials
+	if mgr.ProviderExists(providerMiniMax) {
+		if err := mgr.LoadProvider(providerMiniMax, &creds); err != nil {
+			creds = credentials.MiniMaxCredentials{}
+		}
+	}
+
+	if creds.Accounts == nil {
+		creds.Accounts = make(map[string]*credentials.MiniMaxAccount)
+		if creds.Cookie != "" {
+			creds.Accounts["default"] = &credentials.MiniMaxAccount{Cookie: creds.Cookie, GroupID: creds.GroupID}
+			creds.Cookie = ""
+			creds.GroupID = ""
+		}
+	}
+
+	creds.Accounts[accountName] = &credentials.MiniMaxAccount{Cookie: cookie, GroupID: groupID}
+
+	if err := mgr.SaveProvider(providerMiniMax, creds); err != nil {
+		return fmt.Errorf("failed to save credentials: %w", err)
+	}
+
+	fmt.Printf("Successfully added MiniMax account '%s'!\n", accountName)
+	return nil
+}
+
 // ListAccounts lists all configured accounts
 func ListAccounts(mgr *credentials.Manager, providerID string) error {
 	if providerID == "" {
@@ -236,6 +302,8 @@ func RemoveAccount(mgr *credentials.Manager, providerID, accountName string) err
 		return removeKimiAccount(mgr, accountName)
 	case "zai":
 		return removeZaiAccount(mgr, accountName)
+	case "minimax":
+		return removeMiniMaxAccount(mgr, accountName)
 	default:
 		return fmt.Errorf("unknown provider: %s", providerID)
 	}
@@ -304,6 +372,27 @@ func removeZaiAccount(mgr *credentials.Manager, accountName string) error {
 	return mgr.SaveProvider("zai", creds)
 }
 
+// removeMiniMaxAccount removes a MiniMax account
+func removeMiniMaxAccount(mgr *credentials.Manager, accountName string) error {
+	var creds credentials.MiniMaxCredentials
+	if err := mgr.LoadProvider("minimax", &creds); err != nil {
+		return err
+	}
+
+	if creds.Accounts == nil || creds.Accounts[accountName] == nil {
+		return fmt.Errorf("account '%s' not found", accountName)
+	}
+
+	delete(creds.Accounts, accountName)
+
+	// If no accounts left, delete the file
+	if len(creds.Accounts) == 0 {
+		return mgr.DeleteProvider("minimax")
+	}
+
+	return mgr.SaveProvider("minimax", creds)
+}
+
 // RenameAccount renames an account for a provider
 func RenameAccount(mgr *credentials.Manager, providerID, oldName, newName string) error {
 	if oldName == "" || newName == "" {
@@ -317,6 +406,8 @@ func RenameAccount(mgr *credentials.Manager, providerID, oldName, newName string
 		return renameKimiAccount(mgr, oldName, newName)
 	case "zai":
 		return renameZaiAccount(mgr, oldName, newName)
+	case "minimax":
+		return renameMiniMaxAccount(mgr, oldName, newName)
 	default:
 		return fmt.Errorf("unknown provider: %s", providerID)
 	}
@@ -385,6 +476,27 @@ func renameZaiAccount(mgr *credentials.Manager, oldName, newName string) error {
 	return mgr.SaveProvider("zai", creds)
 }
 
+// renameMiniMaxAccount renames a MiniMax account
+func renameMiniMaxAccount(mgr *credentials.Manager, oldName, newName string) error {
+	var creds credentials.MiniMaxCredentials
+	if err := mgr.LoadProvider("minimax", &creds); err != nil {
+		return err
+	}
+
+	if creds.Accounts == nil || creds.Accounts[oldName] == nil {
+		return fmt.Errorf("account '%s' not found", oldName)
+	}
+
+	if creds.Accounts[newName] != nil {
+		return fmt.Errorf("account '%s' already exists", newName)
+	}
+
+	creds.Accounts[newName] = creds.Accounts[oldName]
+	delete(creds.Accounts, oldName)
+
+	return mgr.SaveProvider("minimax", creds)
+}
+
 // MigrateClaudeCLI migrates credentials from the Claude CLI
 func MigrateClaudeCLI(mgr *credentials.Manager) error {
 	if err := mgr.MigrateFromClaudeCLI(); err != nil {
@@ -404,6 +516,8 @@ func providerName(id string) string {
 		return "Kimi"
 	case providerZAi:
 		return "Z.AI"
+	case providerMiniMax:
+		return "MiniMax"
 	default:
 		return strings.ToUpper(id)
 	}

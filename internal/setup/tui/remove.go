@@ -254,6 +254,31 @@ func (m Model) doRemoveAccount() (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+	case "minimax":
+		var creds credentials.MiniMaxCredentials
+		if loadErr := m.credsMgr.LoadProvider("minimax", &creds); loadErr != nil {
+			err = loadErr
+		} else {
+			// Handle legacy format (single Cookie field)
+			if creds.Accounts == nil {
+				if creds.Cookie != "" && m.selectedAccount == accountDefault {
+					err = m.credsMgr.DeleteProvider("minimax")
+				} else {
+					err = fmt.Errorf("account '%s' not found", m.selectedAccount)
+				}
+			} else {
+				if creds.Accounts[m.selectedAccount] == nil {
+					err = fmt.Errorf("account '%s' not found", m.selectedAccount)
+				} else {
+					delete(creds.Accounts, m.selectedAccount)
+					if len(creds.Accounts) == 0 {
+						err = m.credsMgr.DeleteProvider("minimax")
+					} else {
+						err = m.credsMgr.SaveProvider("minimax", creds)
+					}
+				}
+			}
+		}
 	default:
 		err = fmt.Errorf("unsupported provider: %s", m.selectedProvider)
 	}
