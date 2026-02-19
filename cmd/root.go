@@ -17,6 +17,7 @@ var (
 	allAccountsFlag bool
 	jsonOutput      bool
 	waybarOutput    bool
+	credentialsFile string
 )
 
 var rootCmd = &cobra.Command{
@@ -40,10 +41,16 @@ func init() {
 	rootCmd.Flags().BoolVar(&allAccountsFlag, "all-accounts", false, "Aggregate usage across all accounts")
 	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	rootCmd.Flags().BoolVar(&waybarOutput, "waybar", false, "Output in waybar JSON format")
+	rootCmd.Flags().StringVar(&credentialsFile, "credentials-file", "", "Path to a combined credentials file (values may use $VAR or ${VAR} env references)")
 }
 
 func runUsage(_ *cobra.Command, _ []string) error {
-	credsMgr := credentials.NewManager()
+	var credsMgr *credentials.Manager
+	if credentialsFile != "" {
+		credsMgr = credentials.NewManagerFromFile(credentialsFile)
+	} else {
+		credsMgr = credentials.NewManager()
+	}
 
 	// Determine which providers to query
 	providers := usage.GetProviders(providerFlag, accountFlag, allAccountsFlag, credsMgr)

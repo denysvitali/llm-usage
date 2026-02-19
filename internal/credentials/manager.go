@@ -17,13 +17,32 @@ type ProviderConfig interface {
 
 // Manager handles loading credentials for multiple providers
 type Manager struct {
-	configDir string // $XDG_CONFIG_HOME/llm-usage (defaults to ~/.config/llm-usage)
+	configDir       string // $XDG_CONFIG_HOME/llm-usage (defaults to ~/.config/llm-usage)
+	credentialsFile string // optional path to a combined credentials file
 }
 
 // NewManager creates a new credential manager
 func NewManager() *Manager {
 	return &Manager{
 		configDir: filepath.Join(xdg.ConfigHome, "llm-usage"),
+	}
+}
+
+// NewManagerFromFile creates a credential manager that loads all credentials
+// from a single combined JSON file. Values in the file may reference environment
+// variables using $VAR or ${VAR} syntax, which are expanded at load time.
+//
+// The file format is a JSON object mapping provider IDs to their credential
+// structures, for example:
+//
+//	{
+//	  "claude": { "accounts": { "default": { "accessToken": "$CLAUDE_TOKEN", ... } } },
+//	  "kimi":   { "accounts": { "default": { "apiKey": "$KIMI_API_KEY" } } }
+//	}
+func NewManagerFromFile(path string) *Manager {
+	return &Manager{
+		configDir:       filepath.Join(xdg.ConfigHome, "llm-usage"),
+		credentialsFile: path,
 	}
 }
 
@@ -39,6 +58,10 @@ func (m *Manager) EnsureConfigDir() error {
 
 // LoadProvider loads credentials for a specific provider
 func (m *Manager) LoadProvider(providerID string, config ProviderConfig) error {
+	if m.credentialsFile != "" {
+		return m.loadProviderFromFile(providerID, config)
+	}
+
 	configPath := m.providerPath(providerID)
 
 	data, err := os.ReadFile(configPath) //nolint:gosec
@@ -60,6 +83,50 @@ func (m *Manager) LoadProvider(providerID string, config ProviderConfig) error {
 	return nil
 }
 
+// loadProviderFromFile loads a single provider's credentials from the combined
+// credentials file, expanding environment variable references before parsing.
+func (m *Manager) loadProviderFromFile(providerID string, config ProviderConfig) error {
+	all, err := m.readCombinedFile()
+	if err != nil {
+		return err
+	}
+
+	raw, ok := all[providerID]
+	if !ok {
+		return fmt.Errorf("provider %q not found in credentials file %s", providerID, m.credentialsFile)
+	}
+
+	if err := json.Unmarshal(raw, config); err != nil {
+		return fmt.Errorf("failed to parse credentials for provider %q: %w", providerID, err)
+	}
+
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("invalid credentials for provider %q: %w", providerID, err)
+	}
+
+	return nil
+}
+
+// readCombinedFile reads, env-expands, and parses the combined credentials file.
+func (m *Manager) readCombinedFile() (map[string]json.RawMessage, error) {
+	data, err := os.ReadFile(m.credentialsFile) //nolint:gosec
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("credentials file not found at %s", m.credentialsFile)
+		}
+		return nil, fmt.Errorf("failed to read credentials file: %w", err)
+	}
+
+	expanded := os.ExpandEnv(string(data))
+
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(expanded), &all); err != nil {
+		return nil, fmt.Errorf("failed to parse credentials file %s: %w", m.credentialsFile, err)
+	}
+
+	return all, nil
+}
+
 // providerPath returns the path to a provider's credential file
 func (m *Manager) providerPath(providerID string) string {
 	return filepath.Join(m.configDir, providerID+".json")
@@ -73,6 +140,18 @@ func (m *Manager) ProviderExists(providerID string) bool {
 
 // ListAvailable returns a list of providers that have credential files
 func (m *Manager) ListAvailable() []string {
+	if m.credentialsFile != "" {
+		all, err := m.readCombinedFile()
+		if err != nil {
+			return nil
+		}
+		providers := make([]string, 0, len(all))
+		for id := range all {
+			providers = append(providers, id)
+		}
+		return providers
+	}
+
 	entries, err := os.ReadDir(m.configDir)
 	if err != nil {
 		return nil
