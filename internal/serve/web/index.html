@@ -8,29 +8,42 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Alpine.js via CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Alpine.js Collapse plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
-    <div x-data="usageDashboard()" x-cloak class="container mx-auto px-4 py-8 max-w-6xl">
+    <div x-data="usageDashboard()" x-cloak class="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-6xl">
         <!-- Header -->
-        <header class="mb-8">
-            <div class="flex items-center justify-between">
+        <header class="mb-6 sm:mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-white mb-2">LLM Usage Dashboard</h1>
-                    <p class="text-gray-400">Real-time usage statistics across all providers</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">LLM Usage Dashboard</h1>
+                    <p class="text-gray-400 text-sm">Real-time usage statistics across all providers</p>
                 </div>
-                <div class="flex items-center gap-4">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <!-- Compact/Expand toggle -->
+                    <button @click="compactMode = !compactMode"
+                            class="px-2 sm:px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1.5 text-xs sm:text-sm">
+                        <svg x-show="compactMode" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                        </svg>
+                        <svg x-show="!compactMode" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                        </svg>
+                        <span class="hidden sm:inline" x-text="compactMode ? 'Expand' : 'Collapse'"></span>
+                    </button>
                     <!-- Auto-refresh toggle -->
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" x-model="autoRefresh" class="w-4 h-4 rounded">
-                        <span class="text-sm text-gray-400">Auto-refresh</span>
+                        <span class="text-sm text-gray-400 hidden sm:inline">Auto-refresh</span>
                     </label>
                     <!-- Refresh button -->
                     <button @click="refresh()"
                             :disabled="loading"
-                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
+                            class="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
                         <svg x-show="!loading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
@@ -38,38 +51,38 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Refresh</span>
+                        <span class="hidden sm:inline">Refresh</span>
                     </button>
                 </div>
             </div>
             <!-- Provider filters -->
-            <div class="mt-4 flex items-center gap-2 flex-wrap">
-                <span class="text-sm text-gray-400">Filter:</span>
+            <div class="mt-3 sm:mt-4 flex items-start sm:items-center gap-2 flex-wrap">
+                <span class="text-xs sm:text-sm text-gray-400 pt-1 sm:pt-0">Filter:</span>
                 <button @click="toggleProvider('all')"
                         :class="selectedProviders.includes('all') ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
-                        class="px-3 py-1 rounded-full text-sm transition-colors">
+                        class="px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm transition-colors">
                     All
                 </button>
                 <template x-for="provider in availableProviders" :key="provider.id">
                     <button @click="toggleProvider(provider.id)"
                             :class="selectedProviders.includes(provider.id) ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
-                            class="px-3 py-1 rounded-full text-sm transition-colors"
+                            class="px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm transition-colors"
                             x-text="provider.name">
                     </button>
                 </template>
             </div>
 
             <!-- Sort controls -->
-            <div class="mt-3 flex items-center gap-2">
-                <span class="text-sm text-gray-400">Sort by:</span>
+            <div class="mt-2 sm:mt-3 flex items-start sm:items-center gap-2 flex-wrap">
+                <span class="text-xs sm:text-sm text-gray-400 pt-1 sm:pt-0">Sort:</span>
                 <button @click="sortBy = 'name'"
                         :class="sortBy === 'name' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
-                        class="px-3 py-1 rounded-full text-sm transition-colors">
+                        class="px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm transition-colors">
                     Name
                 </button>
                 <button @click="sortBy = 'usage'"
                         :class="sortBy === 'usage' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
-                        class="px-3 py-1 rounded-full text-sm transition-colors">
+                        class="px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm transition-colors">
                     Usage
                 </button>
             </div>
@@ -91,19 +104,114 @@
         </div>
 
         <!-- Stats grid -->
-        <div x-show="stats?.providers?.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div x-show="stats?.providers?.length > 0" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             <template x-for="(provider, index) in filteredStats" :key="provider.provider + '-' + (provider.extra?.account || index)">
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition-colors">
-                    <!-- Provider header -->
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h2 class="text-xl font-semibold text-white" x-text="getProviderName(provider.provider)"></h2>
-                            <p x-show="provider.extra?.account" class="text-sm text-gray-400" x-text="'Account: ' + provider.extra?.account"></p>
+                <div x-data="{ expanded: !compactMode }" class="bg-gray-800 rounded-xl p-3 border border-gray-700 hover:border-gray-600 transition-colors">
+                    <!-- Compact header - always visible -->
+                    <div @click="expanded = !expanded" class="flex items-center justify-between cursor-pointer select-none">
+                        <div class="min-w-0 flex items-center gap-2">
+                            <span class="text-sm font-medium text-white truncate" x-text="getProviderName(provider.provider)"></span>
+                            <span x-show="provider.extra?.account" class="text-xs text-gray-500 truncate" x-text="'(' + provider.extra.account + ')'"></span>
                         </div>
-                        <div :class="getUtilizationClass(provider)"
-                             class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold"
-                             x-text="getMaxUtilization(provider) + '%'">
+                        <div class="flex items-center gap-1">
+                            <span :class="getUtilizationClass(provider)" class="text-xs font-bold px-1.5 py-0.5 rounded" x-text="getMaxUtilization(provider) + '%'"></span>
+                            <svg :class="expanded ? 'rotate-180' : ''" class="w-4 h-4 text-gray-500 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
                         </div>
+                    </div>
+
+                    <!-- Collapsible content -->
+                    <div x-show="expanded" x-collapse class="mt-3">
+                    <!-- Error state for provider -->
+                    <div x-show="provider.error" class="text-red-400 text-sm bg-red-900/30 rounded-lg p-3">
+                        <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                        <span x-text="provider.error?.message || 'Error fetching usage'"></span>
+                    </div>
+
+                    <!-- Usage windows -->
+                    <div x-show="!provider.error && provider.windows && provider.windows.length > 0" class="space-y-4">
+                        <template x-for="window in provider.windows" :key="window.label">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium text-gray-300" x-text="window.label"></span>
+                                    <span class="text-sm text-gray-400" x-text="formatUtilization(window.utilization)"></span>
+                                </div>
+                                <!-- Progress bar -->
+                                <div class="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                                    <div :class="getUtilizationClass({windows: [window]})"
+                                         class="h-2.5 rounded-full transition-all duration-500"
+                                         :style="'width: ' + Math.min(window.utilization, 100) + '%'"></div>
+                                </div>
+                                <!-- Reset time - compact -->
+                                <div x-show="window.resets_at" class="flex justify-between text-xs text-gray-500">
+                                    <span></span>
+                                    <span x-text="'Resets ' + formatResetTime(window.resets_at)"></span>
+                                </div>
+                                <!-- Token details - compact -->
+                                <div x-show="window.used !== undefined && window.limit !== undefined"
+                                     class="flex justify-between text-xs text-gray-500">
+                                    <span x-text="formatTokens(window.used) + ' / ' + formatTokens(window.limit)"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Extra usage (for Claude) -->
+                    <div x-show="provider.extra?.extra_usage" class="mt-4 pt-4 border-t border-gray-700">
+                        <p class="text-sm font-medium text-gray-300 mb-2">Extra Usage Credits</p>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-400">Usage</span>
+                                <span class="text-xs text-gray-300" x-text="formatUtilization(provider.extra.extra_usage.utilization)"></span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div :class="getUtilizationClass({windows: [{utilization: provider.extra.extra_usage.utilization}]})"
+                                     class="h-2 rounded-full transition-all duration-500"
+                                     :style="'width: ' + Math.min(provider.extra.extra_usage.utilization, 100) + '%'"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-500">
+                                <span x-text="'$' + (provider.extra.extra_usage.used_credits / 100).toFixed(2)"></span>
+                                <span x-text="'of $' + (provider.extra.extra_usage.monthly_limit / 100).toFixed(2)"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kimi subscription -->
+                    <div x-show="provider.extra?.subscription" class="mt-4 pt-4 border-t border-gray-700">
+                        <p class="text-sm font-medium text-cyan-400 mb-2">Subscription</p>
+                        <div class="space-y-2">
+                            <!-- Plan info -->
+                            <div x-show="provider.extra?.subscription?.plan" class="flex items-center gap-2">
+                                <span class="text-sm text-gray-300" x-text="provider.extra?.subscription?.plan?.title"></span>
+                                <span class="text-xs text-gray-500" x-text="'(' + (provider.extra?.subscription?.plan?.level || '') + ')'"></span>
+                                <span :class="provider.extra?.subscription?.plan?.status === 'Active' ? 'text-green-400' : (provider.extra?.subscription?.plan?.status === 'Cancelled' ? 'text-yellow-400' : 'text-red-400')"
+                                      class="text-xs font-medium"
+                                      x-text="provider.extra?.subscription?.plan?.status"></span>
+                            </div>
+                            <!-- Expiry date -->
+                            <div x-show="provider.extra?.subscription?.expires_at" class="flex justify-between text-xs text-gray-500">
+                                <span>Expires:</span>
+                                <span x-text="formatSubscriptionExpiry(provider.extra?.subscription?.expires_at)"></span>
+                            </div>
+                            <!-- Feature quotas -->
+                            <template x-for="feature in (provider.extra?.subscription?.features || [])" :key="feature.feature">
+                                <div class="space-y-1">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-xs font-medium text-blue-400" x-text="feature.feature"></span>
+                                        <span class="text-xs text-gray-500" x-text="feature.left + '/' + feature.total + ' left'"></span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                                        <div :class="getFeatureUtilizationClass(feature)"
+                                             class="h-1.5 rounded-full transition-all duration-500"
+                                             :style="'width: ' + getFeatureUtilization(feature) + '%'"></div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                     </div>
 
                     <!-- Error state for provider -->
@@ -157,8 +265,8 @@
                                      :style="'width: ' + Math.min(provider.extra.extra_usage.utilization, 100) + '%'"></div>
                             </div>
                             <div class="flex justify-between text-xs text-gray-500">
-                                <span x-text="'$' + provider.extra.extra_usage.used_credits.toFixed(2)"></span>
-                                <span x-text="'of $' + provider.extra.extra_usage.monthly_limit.toFixed(2)"></span>
+                                <span x-text="'$' + (provider.extra.extra_usage.used_credits / 100).toFixed(2)"></span>
+                                <span x-text="'of $' + (provider.extra.extra_usage.monthly_limit / 100).toFixed(2)"></span>
                             </div>
                         </div>
                     </div>
@@ -202,12 +310,12 @@
 
         <!-- Empty state -->
         <div x-show="!loading && filteredStats.length === 0 && !error"
-             class="text-center py-20 bg-gray-800 rounded-xl border border-gray-700">
-            <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             class="text-center py-12 sm:py-20 bg-gray-800 rounded-xl border border-gray-700 mx-2 sm:mx-0">
+            <svg class="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-600 mb-3 sm:mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            <p class="text-gray-400">No providers configured.</p>
-            <p class="text-gray-500 text-sm mt-2">Run <code class="bg-gray-700 px-2 py-1 rounded">llm-usage setup</code> to add providers.</p>
+            <p class="text-gray-400 px-4">No providers configured.</p>
+            <p class="text-gray-500 text-xs sm:text-sm mt-2 px-4">Run <code class="bg-gray-700 px-2 py-1 rounded text-xs">llm-usage setup</code> to add providers.</p>
         </div>
 
         <!-- Last updated -->
@@ -228,6 +336,7 @@
                 selectedProviders: ['all'],
                 availableProviders: [],
                 sortBy: 'name', // 'name' or 'usage'
+                compactMode: true, // Default to compact/collapsed view
 
                 init() {
                     this.loadProviders();

@@ -83,7 +83,8 @@ func (p *Provider) parseModelRemain(item ModelRemain) *provider.UsageWindow {
 
 	var utilization float64
 	if total > 0 {
-		utilization = (used / total) * 100
+		// Calculate remaining percentage (inverse of used)
+		utilization = ((total - used) / total) * 100
 	}
 
 	label := item.ModelName
